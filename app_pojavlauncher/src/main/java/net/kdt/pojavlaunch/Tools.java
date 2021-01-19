@@ -25,6 +25,28 @@ import android.widget.Toast;
 
 public final class Tools
 {
+    public static final String MCBBS_API_DOMAIN = "download.mcbbs.net";
+    public static final String MCBBS_ASSETS_PATH = MCBBS_API_DOMAIN + "/assets";
+    public static final String MCBBS_LIBRARIES_PATH = MCBBS_API_DOMAIN + "/maven";
+    public static final String ORIGIN_LAUNCHER_DOMAIN = "launcher.mojang.com";
+    public static final String ORIGIN_LAUNCHER_META_DOMAIN = "launchermeta.mojang.com";
+    public static final String ORIGIN_ASSETS_DOMAIN = "resources.download.minecraft.net";
+    public static final String ORIGIN_LIBRARIES_DOMAIN = "libraries.minecraft.net";
+    public static final String FORGE_LIBRARIES_PATH = "files.minecraftforge.net/maven";
+
+    public static String replaceUrl(String url) {
+        return url
+                .replace(ORIGIN_LAUNCHER_DOMAIN, MCBBS_API_DOMAIN)
+                .replace(ORIGIN_LAUNCHER_META_DOMAIN, MCBBS_API_DOMAIN)
+                .replace(ORIGIN_ASSETS_DOMAIN, MCBBS_ASSETS_PATH)
+                .replace(ORIGIN_LIBRARIES_DOMAIN, MCBBS_LIBRARIES_PATH)
+                .replace(FORGE_LIBRARIES_PATH, MCBBS_LIBRARIES_PATH);
+    }
+
+    public static URL replaceUrl(URL url) throws IOException {
+        return new URL(replaceUrl(url.toString()));
+    }
+
     public static final boolean ENABLE_DEV_FEATURES = BuildConfig.DEBUG;
 
     public static String APP_NAME = "null";

@@ -19,6 +19,7 @@ public class DownloadUtils {
         InputStream is = null;
         try {
 			// System.out.println("Connecting: " + url.toString());
+            url = Tools.replaceUrl(url);
             HttpURLConnection conn = (HttpURLConnection) url.openConnection();
             conn.setRequestProperty("User-Agent", USER_AGENT);
 			conn.setConnectTimeout(10000);
