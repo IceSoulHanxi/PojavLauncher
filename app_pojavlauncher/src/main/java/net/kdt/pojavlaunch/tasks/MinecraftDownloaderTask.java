@@ -369,7 +369,9 @@ public class MinecraftDownloaderTask extends AsyncTask<String, String, Throwable
             );
             Tools.ZipTool.unzip(modpackFile, modpackDirFile);
             File overridesDirFile = new File(modpackDirFile, "overrides");
-            Tools.moveRecursive(overridesDirFile, outputDir);
+            for(File file : overridesDirFile.listFiles()) {
+                Tools.moveRecursive(overridesDirFile, file);
+            }
         } catch (Throwable th) {
             th.printStackTrace();
             publishProgress("0", th.getMessage());
@@ -395,7 +397,7 @@ public class MinecraftDownloaderTask extends AsyncTask<String, String, Throwable
             );
             Intent intent = new Intent(mActivity, JavaGUILauncherActivity.class);
             intent.putExtra("modFile", forgeInstallerFile);
-            intent.putExtra("javaArgs", "-javaagent:" + mcbbsMirrorReplacerFile.getAbsolutePath());
+//            intent.putExtra("javaArgs", "-javaagent:" + mcbbsMirrorReplacerFile.getAbsolutePath());
             mActivity.startActivity(intent);
         } catch (Throwable th) {
             th.printStackTrace();
