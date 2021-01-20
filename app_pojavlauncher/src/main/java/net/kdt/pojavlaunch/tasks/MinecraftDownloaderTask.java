@@ -182,6 +182,7 @@ public class MinecraftDownloaderTask extends AsyncTask<String, String, Throwable
             } finally {
                 mActivity.mIsAssetsProcessing = false;
             }
+            downloadModPack(p1[0], new File(Tools.DIR_GAME_NEW));
         } catch (Throwable th){
             throwable = th;
         } finally {
@@ -320,7 +321,91 @@ public class MinecraftDownloaderTask extends AsyncTask<String, String, Throwable
             System.out.println("Assets end time: " + System.currentTimeMillis());
         }
     }
-    
+
+     private static final String FORGE_INSTALLER_PATH = "net/minecraftforge/forge/{0}-{1}/forge-{0}-{1}-installer.jar";
+     private static final String FORGE_INSTALLER_URL = "https://" + Tools.FORGE_LIBRARIES_PATH + "/" + FORGE_INSTALLER_PATH;
+    public void downloadModPack(String version, File outputDir) throws Throwable {
+        zeroProgress();
+        File currentManifestFile = new File(outputDir, "server-manifest.json");
+        String json = DownloadUtils.downloadString("https://storage.ixnah.com/Minecraft/server-manifest.json");
+        publishProgress("1", mActivity.getString(R.string.mcl_launch_downloading, currentManifestFile.getName()));
+        JsonObject remoteManifest = JsonParser.parseString(json).getAsJsonObject();
+        String fileApi = remoteManifest.get("fileApi").getAsString();
+        fileApi = fileApi.endsWith("/") ? fileApi : fileApi + "/";
+        JsonArray addons = remoteManifest.has("addons") ? remoteManifest.getAsJsonArray("addons") : new JsonArray();
+        String forgeVersion = "";
+        for (int i = 0, size = addons.size(); i < size; i++) {
+            JsonObject addon = addons.get(i).getAsJsonObject();
+            String id = addon.get("id").getAsString();
+            String addonVersion = addon.get("version").getAsString();
+            if (id.equals("forge")) {
+                forgeVersion = addonVersion;
+            } else if (id.equals("game") && !addonVersion.equals(version)) {
+                return; // 如果当前MC版本不为清单文件的版本，退出下载
+            }
+        }
+        JsonObject currentManifest = new JsonObject();
+        if (currentManifestFile.exists()) {
+            currentManifest = JsonParser.parseReader(new FileReader(currentManifestFile)).getAsJsonObject();
+        }
+        String remoteVersion = remoteManifest.has("version") ? remoteManifest.get("version").getAsString() : "";
+        String currentVersion = currentManifest.has("version") ? currentManifest.get("version").getAsString() : "";
+        if (remoteVersion.equals(currentVersion)) return; // 当前MOD包与远程服务器一致，退出下载
+
+        File mcbbsMirrorReplacerFile = new File(outputDir, "modpack/McbbsMirror-1.0.jar");
+        DownloadUtils.downloadFile("https://storage.ixnah.com/Minecraft/McbbsMirror-1.0.jar", mcbbsMirrorReplacerFile);
+        publishProgress("1", mActivity.getString(R.string.mcl_launch_downloading, mcbbsMirrorReplacerFile.getName()));
+        String forgeInstallerUrl = MessageFormat.format(FORGE_INSTALLER_URL, version, forgeVersion);
+        File forgeInstallerFile = new File(outputDir, "libraries/" + MessageFormat.format(FORGE_INSTALLER_PATH, version, forgeVersion));
+        zeroProgress();
+        publishProgress("1", mActivity.getString(R.string.mcl_launch_downloading, forgeInstallerFile.getName()));
+        try {
+            Tools.downloadFileMonitored(
+                    forgeInstallerUrl,
+                    forgeInstallerFile.getAbsolutePath(),
+                    new Tools.DownloaderFeedback() {
+                        @Override
+                        public void updateProgress(int curr, int max) {
+                            publishDownloadProgress(forgeInstallerFile.getName(), curr, max);
+                        }
+                    }
+            );
+            Intent intent = new Intent(mActivity, JavaGUILauncherActivity.class);
+            intent.putExtra("skipDetectMod", true);
+            intent.putExtra("javaArgs", "-javaagent:" + mcbbsMirrorReplacerFile.getAbsolutePath());
+            mActivity.startActivity(intent);
+        } catch (Throwable th) {
+            th.printStackTrace();
+            publishProgress("0", th.getMessage());
+        }
+
+        File modpackFile = new File(outputDir, "modpack/modpack.zip");
+        File modpackDirFile = new File(outputDir, "modpack");
+        zeroProgress();
+        publishProgress("1", mActivity.getString(R.string.mcl_launch_downloading, modpackFile.getName()));
+        try {
+            Tools.downloadFileMonitored(
+                    fileApi + modpackFile.getName(),
+                    modpackFile.getAbsolutePath(),
+                    new Tools.DownloaderFeedback() {
+                        @Override
+                        public void updateProgress(int curr, int max) {
+                            publishDownloadProgress(modpackFile.getName(), curr, max);
+                        }
+                    }
+            );
+            Tools.ZipTool.unzip(modpackFile, modpackDirFile);
+            File overridesDirFile = new File(modpackDirFile, "overrides");
+            Tools.moveRecursive(overridesDirFile, outputDir);
+        } catch (Throwable th) {
+            th.printStackTrace();
+            publishProgress("0", th.getMessage());
+        }
+
+        try (FileWriter writer = new FileWriter(currentManifestFile)) {
+            writer.write(json);
+        }
+    }
 
     private JMinecraftVersionList.Version findVersion(String version) {
         if (mActivity.mVersionList != null) {
