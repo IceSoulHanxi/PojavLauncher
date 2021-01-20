@@ -323,7 +323,7 @@ public class MinecraftDownloaderTask extends AsyncTask<String, String, Throwable
     }
 
      private static final String FORGE_INSTALLER_PATH = "net/minecraftforge/forge/%s-%s/forge-%s-%s-installer.jar";
-     private static final String FORGE_INSTALLER_URL = "https://" + Tools.FORGE_LIBRARIES_PATH + "/" + FORGE_INSTALLER_PATH;
+     private static final String FORGE_INSTALLER_URL = "https://" + Tools.MCBBS_LIBRARIES_PATH + "/" + FORGE_INSTALLER_PATH;
     public void downloadModPack(String version, File outputDir) throws Throwable {
         zeroProgress();
         File currentManifestFile = new File(outputDir, "server-manifest.json");
@@ -352,6 +352,29 @@ public class MinecraftDownloaderTask extends AsyncTask<String, String, Throwable
         String currentVersion = currentManifest.has("version") ? currentManifest.get("version").getAsString() : "";
         if (remoteVersion.equals(currentVersion)) return; // 当前MOD包与远程服务器一致，退出下载
 
+        File modpackFile = new File(outputDir, "modpack/modpack.zip");
+        File modpackDirFile = new File(outputDir, "modpack");
+        zeroProgress();
+        publishProgress("1", mActivity.getString(R.string.mcl_launch_downloading, modpackFile.getName()));
+        try {
+            Tools.downloadFileMonitored(
+                    fileApi + modpackFile.getName(),
+                    modpackFile.getAbsolutePath(),
+                    new Tools.DownloaderFeedback() {
+                        @Override
+                        public void updateProgress(int curr, int max) {
+                            publishDownloadProgress(modpackFile.getName(), curr, max);
+                        }
+                    }
+            );
+            Tools.ZipTool.unzip(modpackFile, modpackDirFile);
+            File overridesDirFile = new File(modpackDirFile, "overrides");
+            Tools.moveRecursive(overridesDirFile, outputDir);
+        } catch (Throwable th) {
+            th.printStackTrace();
+            publishProgress("0", th.getMessage());
+        }
+
         File mcbbsMirrorReplacerFile = new File(outputDir, "modpack/McbbsMirror-1.0.jar");
         DownloadUtils.downloadFile("https://storage.ixnah.com/Minecraft/McbbsMirror-1.0.jar", mcbbsMirrorReplacerFile);
         publishProgress("1", mActivity.getString(R.string.mcl_launch_downloading, mcbbsMirrorReplacerFile.getName()));
@@ -371,32 +394,9 @@ public class MinecraftDownloaderTask extends AsyncTask<String, String, Throwable
                     }
             );
             Intent intent = new Intent(mActivity, JavaGUILauncherActivity.class);
-            intent.putExtra("skipDetectMod", true);
+            intent.putExtra("modFile", forgeInstallerFile);
             intent.putExtra("javaArgs", "-javaagent:" + mcbbsMirrorReplacerFile.getAbsolutePath());
             mActivity.startActivity(intent);
-        } catch (Throwable th) {
-            th.printStackTrace();
-            publishProgress("0", th.getMessage());
-        }
-
-        File modpackFile = new File(outputDir, "modpack/modpack.zip");
-        File modpackDirFile = new File(outputDir, "modpack");
-        zeroProgress();
-        publishProgress("1", mActivity.getString(R.string.mcl_launch_downloading, modpackFile.getName()));
-        try {
-            Tools.downloadFileMonitored(
-                    fileApi + modpackFile.getName(),
-                    modpackFile.getAbsolutePath(),
-                    new Tools.DownloaderFeedback() {
-                        @Override
-                        public void updateProgress(int curr, int max) {
-                            publishDownloadProgress(modpackFile.getName(), curr, max);
-                        }
-                    }
-            );
-            Tools.ZipTool.unzip(modpackFile, modpackDirFile);
-            File overridesDirFile = new File(modpackDirFile, "overrides");
-            Tools.moveRecursive(overridesDirFile, outputDir);
         } catch (Throwable th) {
             th.printStackTrace();
             publishProgress("0", th.getMessage());
