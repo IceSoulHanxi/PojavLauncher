@@ -47,7 +47,7 @@ public class PojavProfile
                 acc.username = "0";
             }
             if (acc.selectedVersion == null) {
-                acc.selectedVersion = "1.7.10";
+                acc.selectedVersion = "1.16.4";
             }
             if (acc.msaRefreshToken == null) {
                 acc.msaRefreshToken = "0";
