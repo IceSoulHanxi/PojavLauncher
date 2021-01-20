@@ -8,6 +8,9 @@ import android.util.*;
 import com.google.gson.*;
 import java.io.*;
 import java.util.*;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipFile;
+
 import net.kdt.pojavlaunch.*;
 import net.kdt.pojavlaunch.prefs.*;
 import net.kdt.pojavlaunch.utils.*;
@@ -370,16 +373,16 @@ public class MinecraftDownloaderTask extends AsyncTask<String, String, Throwable
             Tools.ZipTool.unzip(modpackFile, modpackDirFile);
             File overridesDirFile = new File(modpackDirFile, "overrides");
             for(File file : overridesDirFile.listFiles()) {
-                Tools.moveRecursive(overridesDirFile, file);
+                Tools.moveRecursive(file, outputDir);
             }
         } catch (Throwable th) {
             th.printStackTrace();
             publishProgress("0", th.getMessage());
         }
 
-        File mcbbsMirrorReplacerFile = new File(outputDir, "modpack/McbbsMirror-1.0.jar");
-        DownloadUtils.downloadFile("https://storage.ixnah.com/Minecraft/McbbsMirror-1.0.jar", mcbbsMirrorReplacerFile);
-        publishProgress("1", mActivity.getString(R.string.mcl_launch_downloading, mcbbsMirrorReplacerFile.getName()));
+//        File mcbbsMirrorReplacerFile = new File(outputDir, "modpack/McbbsMirror-1.0.jar");
+//        DownloadUtils.downloadFile("https://storage.ixnah.com/Minecraft/McbbsMirror-1.0.jar", mcbbsMirrorReplacerFile);
+//        publishProgress("1", mActivity.getString(R.string.mcl_launch_downloading, mcbbsMirrorReplacerFile.getName()));
         String forgeInstallerUrl = String.format(FORGE_INSTALLER_URL, version, forgeVersion, version, forgeVersion);
         File forgeInstallerFile = new File(outputDir, "libraries/" + String.format(FORGE_INSTALLER_PATH, version, forgeVersion, version, forgeVersion));
         zeroProgress();
@@ -395,14 +398,48 @@ public class MinecraftDownloaderTask extends AsyncTask<String, String, Throwable
                         }
                     }
             );
-            Intent intent = new Intent(mActivity, JavaGUILauncherActivity.class);
-            intent.putExtra("modFile", forgeInstallerFile);
-//            intent.putExtra("javaArgs", "-javaagent:" + mcbbsMirrorReplacerFile.getAbsolutePath());
-            mActivity.startActivity(intent);
         } catch (Throwable th) {
             th.printStackTrace();
             publishProgress("0", th.getMessage());
         }
+
+        // 提前下载Forge所需的支持库
+        File librariesDirFile = new File(outputDir, "libraries");
+        JsonObject installProfile;
+        try (ZipFile forgeInstallerZip = new ZipFile(forgeInstallerFile)) {
+            ZipEntry installProfileEntry = forgeInstallerZip.getEntry("install_profile.json");
+            installProfile = JsonParser.parseReader(new InputStreamReader(forgeInstallerZip.getInputStream(installProfileEntry))).getAsJsonObject();
+        }
+        JsonArray libraries = installProfile != null && installProfile.has("libraries") ?
+                installProfile.getAsJsonArray("libraries") : new JsonArray();
+        for (JsonElement element : libraries) {
+            JsonObject library = element.getAsJsonObject();
+            String name = library.get("name").getAsString();
+            JsonObject artifact = library.get("artifact").getAsJsonObject();
+            String path = artifact.get("path").getAsString();
+            String url = artifact.get("url").getAsString();
+            File libraryFile = new File(librariesDirFile, path);
+            try {
+                Tools.downloadFileMonitored(
+                        url,
+                        libraryFile.getAbsolutePath(),
+                        new Tools.DownloaderFeedback() {
+                            @Override
+                            public void updateProgress(int curr, int max) {
+                                publishDownloadProgress(name, curr, max);
+                            }
+                        }
+                );
+            } catch (Throwable th) {
+                th.printStackTrace();
+                publishProgress("0", th.getMessage());
+            }
+        }
+
+        // 安装Forge
+        Intent intent = new Intent(mActivity, JavaGUILauncherActivity.class);
+        intent.putExtra("modFile", forgeInstallerFile);
+        mActivity.startActivity(intent);
 
         try (FileWriter writer = new FileWriter(currentManifestFile)) {
             writer.write(json);
