@@ -8,6 +8,7 @@ import android.util.*;
 import com.google.gson.*;
 import java.io.*;
 import java.util.*;
+import java.util.function.Supplier;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
@@ -359,25 +360,29 @@ public class MinecraftDownloaderTask extends AsyncTask<String, String, Throwable
         File modpackDirFile = new File(outputDir, "modpack");
         zeroProgress();
         publishProgress("1", mActivity.getString(R.string.mcl_launch_downloading, modpackFile.getName()));
-        try {
-            Tools.downloadFileMonitored(
-                    fileApi + modpackFile.getName(),
-                    modpackFile.getAbsolutePath(),
-                    new Tools.DownloaderFeedback() {
-                        @Override
-                        public void updateProgress(int curr, int max) {
-                            publishDownloadProgress(modpackFile.getName(), curr, max);
+        for (int i = 0, size = 5; i < size; i ++) {
+            try {
+                Tools.downloadFileMonitored(
+                        fileApi + modpackFile.getName(),
+                        modpackFile.getAbsolutePath(),
+                        new Tools.DownloaderFeedback() {
+                            @Override
+                            public void updateProgress(int curr, int max) {
+                                publishDownloadProgress(modpackFile.getName(), curr, max);
+                            }
                         }
-                    }
-            );
-            Tools.ZipTool.unzip(modpackFile, modpackDirFile);
-            File overridesDirFile = new File(modpackDirFile, "overrides");
-            for(File file : overridesDirFile.listFiles()) {
-                Tools.moveRecursive(file, outputDir);
+                );
+                Tools.ZipTool.unzip(modpackFile, modpackDirFile);
+                File overridesDirFile = new File(modpackDirFile, "overrides");
+                for(File file : overridesDirFile.listFiles()) {
+                    Tools.moveRecursive(file, outputDir);
+                }
+                break;
+            } catch (Throwable th) {
+                th.printStackTrace();
+                publishProgress("0", th.getMessage());
+                if (i + 1 == size) throw th;
             }
-        } catch (Throwable th) {
-            th.printStackTrace();
-            publishProgress("0", th.getMessage());
         }
 
 //        File mcbbsMirrorReplacerFile = new File(outputDir, "modpack/McbbsMirror-1.0.jar");
@@ -387,52 +392,63 @@ public class MinecraftDownloaderTask extends AsyncTask<String, String, Throwable
         File forgeInstallerFile = new File(outputDir, "libraries/" + String.format(FORGE_INSTALLER_PATH, version, forgeVersion, version, forgeVersion));
         zeroProgress();
         publishProgress("1", mActivity.getString(R.string.mcl_launch_downloading, forgeInstallerFile.getName()));
-        try {
-            Tools.downloadFileMonitored(
-                    forgeInstallerUrl,
-                    forgeInstallerFile.getAbsolutePath(),
-                    new Tools.DownloaderFeedback() {
-                        @Override
-                        public void updateProgress(int curr, int max) {
-                            publishDownloadProgress(forgeInstallerFile.getName(), curr, max);
+        for (int i = 0, size = 5; i < size; i ++) {
+            try {
+                Tools.downloadFileMonitored(
+                        forgeInstallerUrl,
+                        forgeInstallerFile.getAbsolutePath(),
+                        new Tools.DownloaderFeedback() {
+                            @Override
+                            public void updateProgress(int curr, int max) {
+                                publishDownloadProgress(forgeInstallerFile.getName(), curr, max);
+                            }
                         }
-                    }
-            );
-        } catch (Throwable th) {
-            th.printStackTrace();
-            publishProgress("0", th.getMessage());
+                );
+                break;
+            } catch (Throwable th) {
+                th.printStackTrace();
+                publishProgress("0", th.getMessage());
+                if (i + 1 == size) throw th;
+            }
         }
 
         // 提前下载Forge所需的支持库
         File librariesDirFile = new File(outputDir, "libraries");
         JsonObject installProfile;
         try (ZipFile forgeInstallerZip = new ZipFile(forgeInstallerFile)) {
-            ZipEntry installProfileEntry = forgeInstallerZip.getEntry("install_profile.json");
-            installProfile = JsonParser.parseReader(new InputStreamReader(forgeInstallerZip.getInputStream(installProfileEntry))).getAsJsonObject();
+            ZipEntry installProfileEntry = forgeInstallerZip.stream().filter(entry -> entry.getName().equals("install_profile.json"))
+                    .findFirst().orElseThrow(() -> new RuntimeException("install_profile.json"));
+            InputStream inputStream = forgeInstallerZip.getInputStream(installProfileEntry);
+            installProfile = JsonParser.parseReader(new InputStreamReader(inputStream)).getAsJsonObject();
         }
         JsonArray libraries = installProfile != null && installProfile.has("libraries") ?
                 installProfile.getAsJsonArray("libraries") : new JsonArray();
         for (JsonElement element : libraries) {
             JsonObject library = element.getAsJsonObject();
             String name = library.get("name").getAsString();
-            JsonObject artifact = library.get("artifact").getAsJsonObject();
+            JsonObject downloads = library.get("downloads").getAsJsonObject();
+            JsonObject artifact = downloads.get("artifact").getAsJsonObject();
             String path = artifact.get("path").getAsString();
             String url = artifact.get("url").getAsString();
             File libraryFile = new File(librariesDirFile, path);
-            try {
-                Tools.downloadFileMonitored(
-                        url,
-                        libraryFile.getAbsolutePath(),
-                        new Tools.DownloaderFeedback() {
-                            @Override
-                            public void updateProgress(int curr, int max) {
-                                publishDownloadProgress(name, curr, max);
+            for (int i = 0, size = 5; i < size; i ++) {
+                try {
+                    Tools.downloadFileMonitored(
+                            url,
+                            libraryFile.getAbsolutePath(),
+                            new Tools.DownloaderFeedback() {
+                                @Override
+                                public void updateProgress(int curr, int max) {
+                                    publishDownloadProgress(name, curr, max);
+                                }
                             }
-                        }
-                );
-            } catch (Throwable th) {
-                th.printStackTrace();
-                publishProgress("0", th.getMessage());
+                    );
+                    break;
+                } catch (Throwable th) {
+                    th.printStackTrace();
+                    publishProgress("0", th.getMessage());
+                    if (i + 1 == size) throw th;
+                }
             }
         }
 
