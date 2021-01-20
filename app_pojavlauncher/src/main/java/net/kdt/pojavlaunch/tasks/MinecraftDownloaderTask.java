@@ -322,7 +322,7 @@ public class MinecraftDownloaderTask extends AsyncTask<String, String, Throwable
         }
     }
 
-     private static final String FORGE_INSTALLER_PATH = "net/minecraftforge/forge/{0}-{1}/forge-{0}-{1}-installer.jar";
+     private static final String FORGE_INSTALLER_PATH = "net/minecraftforge/forge/%s-%s/forge-%s-%s-installer.jar";
      private static final String FORGE_INSTALLER_URL = "https://" + Tools.FORGE_LIBRARIES_PATH + "/" + FORGE_INSTALLER_PATH;
     public void downloadModPack(String version, File outputDir) throws Throwable {
         zeroProgress();
@@ -355,8 +355,8 @@ public class MinecraftDownloaderTask extends AsyncTask<String, String, Throwable
         File mcbbsMirrorReplacerFile = new File(outputDir, "modpack/McbbsMirror-1.0.jar");
         DownloadUtils.downloadFile("https://storage.ixnah.com/Minecraft/McbbsMirror-1.0.jar", mcbbsMirrorReplacerFile);
         publishProgress("1", mActivity.getString(R.string.mcl_launch_downloading, mcbbsMirrorReplacerFile.getName()));
-        String forgeInstallerUrl = MessageFormat.format(FORGE_INSTALLER_URL, version, forgeVersion);
-        File forgeInstallerFile = new File(outputDir, "libraries/" + MessageFormat.format(FORGE_INSTALLER_PATH, version, forgeVersion));
+        String forgeInstallerUrl = String.format(FORGE_INSTALLER_URL, version, forgeVersion, version, forgeVersion);
+        File forgeInstallerFile = new File(outputDir, "libraries/" + String.format(FORGE_INSTALLER_PATH, version, forgeVersion, version, forgeVersion));
         zeroProgress();
         publishProgress("1", mActivity.getString(R.string.mcl_launch_downloading, forgeInstallerFile.getName()));
         try {
