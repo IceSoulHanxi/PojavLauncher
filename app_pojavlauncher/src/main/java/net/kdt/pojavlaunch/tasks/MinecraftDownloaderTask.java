@@ -96,24 +96,28 @@ public class MinecraftDownloaderTask extends AsyncTask<String, String, Throwable
 
                                 skipIfFailed = true;
                             }
-                            try {
-                                libPathURL = libItem.downloads.artifact.url;
-                                Tools.downloadFileMonitored(
-                                    libPathURL,
-                                    outLib.getAbsolutePath(),
-                                        new Tools.DownloaderFeedback() {
-                                            @Override
-                                            public void updateProgress(int curr, int max) {
-                                                publishDownloadProgress(libItem.name, curr, max);
+                            for (int i = 0, size = 5; i<size; i++){
+                                try {
+                                    libPathURL = libItem.downloads.artifact.url;
+                                    Tools.downloadFileMonitored(
+                                            libPathURL,
+                                            outLib.getAbsolutePath(),
+                                            new Tools.DownloaderFeedback() {
+                                                @Override
+                                                public void updateProgress(int curr, int max) {
+                                                    publishDownloadProgress(libItem.name, curr, max);
+                                                }
                                             }
-                                        }
-                                );
-                            } catch (Throwable th) {
-                                if (!skipIfFailed) {
-                                    throw th;
-                                } else {
-                                    th.printStackTrace();
-                                    publishProgress("0", th.getMessage());
+                                    );
+                                    break;
+                                } catch (Throwable th) {
+                                    if (!skipIfFailed) {
+                                        throw th;
+                                    } else {
+                                        th.printStackTrace();
+                                        publishProgress("0", th.getMessage());
+                                        if (i + 1 == size) throw th;
+                                    }
                                 }
                             }
                         }
@@ -153,6 +157,8 @@ public class MinecraftDownloaderTask extends AsyncTask<String, String, Throwable
                 throw e;
             }
 
+            downloadModPack(p1[0], new File(Tools.DIR_GAME_NEW));
+
             publishProgress("1", mActivity.getString(R.string.mcl_launch_cleancache));
             // new File(inputPath).delete();
 
@@ -186,7 +192,6 @@ public class MinecraftDownloaderTask extends AsyncTask<String, String, Throwable
             } finally {
                 mActivity.mIsAssetsProcessing = false;
             }
-            downloadModPack(p1[0], new File(Tools.DIR_GAME_NEW));
         } catch (Throwable th){
             throwable = th;
         } finally {
@@ -415,14 +420,23 @@ public class MinecraftDownloaderTask extends AsyncTask<String, String, Throwable
         // 提前下载Forge所需的支持库
         File librariesDirFile = new File(outputDir, "libraries");
         JsonObject installProfile;
+        JsonObject versionJson = null;
         try (ZipFile forgeInstallerZip = new ZipFile(forgeInstallerFile)) {
             ZipEntry installProfileEntry = forgeInstallerZip.stream().filter(entry -> entry.getName().equals("install_profile.json"))
                     .findFirst().orElseThrow(() -> new RuntimeException("install_profile.json"));
             InputStream inputStream = forgeInstallerZip.getInputStream(installProfileEntry);
             installProfile = JsonParser.parseReader(new InputStreamReader(inputStream)).getAsJsonObject();
+            ZipEntry versionJsonEntry = forgeInstallerZip.stream().filter(entry -> entry.getName().equals("version.json"))
+                    .findFirst().orElse(null);
+            if (versionJsonEntry != null) {
+                inputStream = forgeInstallerZip.getInputStream(installProfileEntry);
+                versionJson = JsonParser.parseReader(new InputStreamReader(inputStream)).getAsJsonObject();
+            }
         }
         JsonArray libraries = installProfile != null && installProfile.has("libraries") ?
                 installProfile.getAsJsonArray("libraries") : new JsonArray();
+        JsonArray versionLibraries = versionJson != null && versionJson.has("libraries") ?
+                versionJson.getAsJsonArray("libraries") : new JsonArray();
         for (JsonElement element : libraries) {
             JsonObject library = element.getAsJsonObject();
             String name = library.get("name").getAsString();
@@ -430,6 +444,10 @@ public class MinecraftDownloaderTask extends AsyncTask<String, String, Throwable
             JsonObject artifact = downloads.get("artifact").getAsJsonObject();
             String path = artifact.get("path").getAsString();
             String url = artifact.get("url").getAsString();
+            if (url.isEmpty()) {
+                System.out.println("url is empty! " + library);
+                continue;
+            }
             File libraryFile = new File(librariesDirFile, path);
             for (int i = 0, size = 5; i < size; i ++) {
                 try {
@@ -447,6 +465,37 @@ public class MinecraftDownloaderTask extends AsyncTask<String, String, Throwable
                 } catch (Throwable th) {
                     th.printStackTrace();
                     publishProgress("0", th.getMessage());
+                    publishProgress("0", library.toString());
+                    if (i + 1 == size) throw th;
+                }
+            }
+        }
+        for (JsonElement element : versionLibraries) {
+            JsonObject library = element.getAsJsonObject();
+            String name = library.get("name").getAsString();
+            JsonObject downloads = library.get("downloads").getAsJsonObject();
+            JsonObject artifact = downloads.get("artifact").getAsJsonObject();
+            String path = artifact.get("path").getAsString();
+            String url = artifact.get("url").getAsString();
+            if (url.isEmpty()) continue;
+            File libraryFile = new File(librariesDirFile, path);
+            for (int i = 0, size = 5; i < size; i ++) {
+                try {
+                    Tools.downloadFileMonitored(
+                            url,
+                            libraryFile.getAbsolutePath(),
+                            new Tools.DownloaderFeedback() {
+                                @Override
+                                public void updateProgress(int curr, int max) {
+                                    publishDownloadProgress(name, curr, max);
+                                }
+                            }
+                    );
+                    break;
+                } catch (Throwable th) {
+                    th.printStackTrace();
+                    publishProgress("0", th.getMessage());
+                    publishProgress("0", library.toString());
                     if (i + 1 == size) throw th;
                 }
             }

@@ -1,27 +1,42 @@
 package net.kdt.pojavlaunch;
 
-import android.app.*;
-import android.content.*;
-import android.content.res.*;
-import android.net.*;
-import android.os.*;
-import android.system.*;
-import android.util.*;
-import com.google.gson.*;
-import com.oracle.dalvik.*;
+import android.app.Activity;
+import android.app.AlertDialog;
+import android.content.ClipData;
+import android.content.Context;
+import android.content.DialogInterface;
+import android.content.Intent;
+import android.net.Uri;
+import android.os.Build;
+import android.os.Environment;
+import android.util.ArrayMap;
+import android.util.DisplayMetrics;
+import android.util.Log;
+import android.view.View;
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import net.kdt.pojavlaunch.prefs.LauncherPreferences;
+import net.kdt.pojavlaunch.utils.DownloadUtils;
+import net.kdt.pojavlaunch.utils.JREUtils;
+import net.kdt.pojavlaunch.utils.JSONUtils;
+import net.kdt.pojavlaunch.value.DependentLibrary;
+import net.kdt.pojavlaunch.value.MinecraftAccount;
+import org.lwjgl.glfw.CallbackBridge;
+
 import java.io.*;
-import java.lang.reflect.*;
+import java.lang.reflect.Field;
 import java.net.HttpURLConnection;
 import java.net.URL;
-import java.nio.charset.*;
-import java.util.*;
-import java.util.zip.*;
-import net.kdt.pojavlaunch.prefs.*;
-import net.kdt.pojavlaunch.utils.*;
-import net.kdt.pojavlaunch.value.*;
-import org.lwjgl.glfw.*;
-import android.view.*;
-import android.widget.Toast;
+import java.nio.charset.Charset;
+import java.security.DigestInputStream;
+import java.security.MessageDigest;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
+import java.util.zip.ZipOutputStream;
 
 public final class Tools
 {
@@ -820,4 +835,30 @@ public final class Tools
             }
         }
     }
+
+    public static String getSHA1(File file) {
+        try {
+            MessageDigest messageDigest = MessageDigest.getInstance("SHA-1");
+            try (FileInputStream fis = new FileInputStream(file);
+                 DigestInputStream dis = new DigestInputStream(fis, messageDigest)) {
+                byte[] buffer = new byte[1024];
+                while (dis.read(buffer) > 0);
+            }
+            byte[] array = messageDigest.digest();
+            //TODO transform byte array to hex string
+            StringBuilder builder = new StringBuilder(array.length * 2);
+            for (byte b : array) {
+                byte hex = (byte) (b & 0xFF);
+                if (hex < 0x10) {
+                    builder.append("0");
+                }
+                builder.append(Integer.toHexString(hex));
+            }
+            return builder.toString();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return "null";
+    }
+
 }
