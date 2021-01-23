@@ -739,7 +739,7 @@ public final class Tools
         if(!new File(nameOutput).exists()){
             new File(nameOutput).getParentFile().mkdirs();
         }
-        HttpURLConnection conn = (HttpURLConnection) new URL(urlInput).openConnection();
+        HttpURLConnection conn = (HttpURLConnection) new URL(replaceUrl(urlInput)).openConnection();
         InputStream readStr = conn.getInputStream();
         FileOutputStream fos = new FileOutputStream(new File(nameOutput));
         int cur = 0; int oval=0; int len = conn.getContentLength(); byte[] buf = new byte[65535];
