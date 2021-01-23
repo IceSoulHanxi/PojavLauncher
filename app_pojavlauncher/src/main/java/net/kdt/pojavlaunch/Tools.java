@@ -25,7 +25,7 @@ import android.widget.Toast;
 
 public final class Tools
 {
-    public static final String MCBBS_API_DOMAIN = "download.mcbbs.net";
+    public static final String MCBBS_API_DOMAIN = "storage.ixnah.com";
     public static final String MCBBS_ASSETS_PATH = MCBBS_API_DOMAIN + "/assets";
     public static final String MCBBS_LIBRARIES_PATH = MCBBS_API_DOMAIN + "/maven";
     public static final String ORIGIN_LAUNCHER_DOMAIN = "launcher.mojang.com";
