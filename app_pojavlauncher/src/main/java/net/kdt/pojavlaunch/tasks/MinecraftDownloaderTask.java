@@ -327,7 +327,7 @@ public class MinecraftDownloaderTask extends AsyncTask<String, String, Throwable
     }
 
      private static final String FORGE_INSTALLER_PATH = "net/minecraftforge/forge/%s-%s/forge-%s-%s-installer.jar";
-     private static final String FORGE_INSTALLER_URL = "https://" + Tools.MCBBS_LIBRARIES_PATH + "/" + FORGE_INSTALLER_PATH;
+     private static final String FORGE_INSTALLER_URL = "https://storage.ixnah.com/maven/" + FORGE_INSTALLER_PATH;
     public void downloadModPack(String version, File outputDir) throws Throwable {
         zeroProgress();
         File currentManifestFile = new File(outputDir, "server-manifest.json");
