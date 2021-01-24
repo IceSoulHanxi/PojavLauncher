@@ -10,6 +10,7 @@
  * - Implements glfwSetCursorPos() to handle grab camera pos correctly.
  */
  
+#include <stdlib.h>
 #include <jni.h>
 #include <assert.h>
 
@@ -40,7 +41,7 @@ static int grabCursorX, grabCursorY, lastCursorX, lastCursorY;
 
 jclass inputBridgeClass_ANDROID, inputBridgeClass_JRE;
 jmethodID inputBridgeMethod_ANDROID, inputBridgeMethod_JRE;
-
+jclass bridgeClazz;
 jboolean isGrabbing;
 
 jint JNI_OnLoad(JavaVM* vm, void* reserved) {
@@ -48,7 +49,8 @@ jint JNI_OnLoad(JavaVM* vm, void* reserved) {
         //Save dalvik global JavaVM pointer
         dalvikJavaVMPtr = vm;
         (*vm)->GetEnv(vm, (void**) &dalvikJNIEnvPtr_ANDROID, JNI_VERSION_1_4);
-        
+        bridgeClazz = (*dalvikJNIEnvPtr_ANDROID)->NewGlobalRef(dalvikJNIEnvPtr_ANDROID,(*dalvikJNIEnvPtr_ANDROID) ->FindClass(dalvikJNIEnvPtr_ANDROID,"org/lwjgl/glfw/CallbackBridge"));
+        assert(bridgeClazz != NULL);
         isUseStackQueueCall = JNI_FALSE;
     } else if (dalvikJavaVMPtr != vm) {
         runtimeJavaVMPtr = vm;
@@ -175,22 +177,30 @@ JNIEXPORT jboolean JNICALL Java_org_lwjgl_glfw_CallbackBridge_nativeAttachThread
     if (isUseStackQueueCall && isAndroid && result) {
         isPrepareGrabPos = true;
     }
-        getJavaInputBridge(&inputBridgeClass_ANDROID, &inputBridgeMethod_ANDROID);
+    getJavaInputBridge(&inputBridgeClass_ANDROID, &inputBridgeMethod_ANDROID);
     
     return result;
 }
 
-JNIEXPORT jstring JNICALL Java_org_lwjgl_glfw_CallbackBridge_nativeClipboard(JNIEnv* env, jclass clazz, jint action, jstring copy) {
+JNIEXPORT jstring JNICALL Java_org_lwjgl_glfw_CallbackBridge_nativeClipboard(JNIEnv* env, jclass clazz, jint action, jstring copySrc) {
 #ifdef DEBUG
     LOGD("Debug: Clipboard access is going on\n", isUseStackQueueCall);
 #endif
-    // TODO: if crash here, then convert jstring to jstring (diff JVM)
-    jclass bridgeClazz = (*dalvikJNIEnvPtr_JRE)->FindClass(dalvikJNIEnvPtr_JRE, "org/lwjgl/glfw/CallbackBridge");
+
+    JNIEnv *dalvikEnv;
+    (*dalvikJavaVMPtr)->AttachCurrentThread(dalvikJavaVMPtr, &dalvikEnv, NULL);
+    assert(dalvikEnv != NULL);
     assert(bridgeClazz != NULL);
-    jmethodID bridgeMethod = (*dalvikJNIEnvPtr_JRE)->GetStaticMethodID(dalvikJNIEnvPtr_JRE, bridgeClazz, "accessAndroidClipboard", "(ILjava/lang/String;)Ljava/lang/String;");
+    LOGD("Clipboard: Obtaining method\n");
+    jmethodID bridgeMethod = (* dalvikEnv)->GetStaticMethodID(dalvikEnv, bridgeClazz, "accessAndroidClipboard", "(ILjava/lang/String;)Ljava/lang/String;");
     assert(bridgeMethod != NULL);
     
-    return (jstring) (*dalvikJNIEnvPtr_JRE)->CallStaticObjectMethod(dalvikJNIEnvPtr_JRE, bridgeClazz, bridgeMethod, action, copy);
+    LOGD("Clipboard: Converting string\n");
+    jstring copyDst = convertStringJVM(env, dalvikEnv, copySrc);
+    LOGD("Clipboard: Calling 2nd\n");
+    jstring pasteDst = convertStringJVM(dalvikEnv, env, (jstring) (*dalvikEnv)->CallStaticObjectMethod(dalvikEnv, bridgeClazz, bridgeMethod, action, copyDst));
+    (*dalvikJavaVMPtr)->DetachCurrentThread(dalvikJavaVMPtr);
+    return pasteDst;
 }
 
 JNIEXPORT jboolean JNICALL Java_org_lwjgl_glfw_CallbackBridge_nativeSetInputReady(JNIEnv* env, jclass clazz, jboolean inputReady) {

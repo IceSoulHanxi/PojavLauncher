@@ -205,6 +205,7 @@ public class JavaGUILauncherActivity extends LoggableActivity {
             javaArgList.add("-Djava.security.manager=net.sourceforge.prograde.sm.ProGradeJSM");
             javaArgList.add("-Djava.security.policy=" + Tools.DIR_DATA + "/java_sandbox.policy");
             Collections.reverse(javaArgList);
+
             return JREUtils.launchJavaVM(this, javaArgList);
         } catch (Throwable th) {
             Tools.showError(this, th, true);
