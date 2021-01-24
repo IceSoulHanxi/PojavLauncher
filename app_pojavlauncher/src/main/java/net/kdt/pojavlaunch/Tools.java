@@ -751,13 +751,16 @@ public final class Tools
         public abstract void updateProgress(int curr, int max);
     }
     public static void downloadFileMonitored(String urlInput,String nameOutput, DownloaderFeedback monitor) throws IOException {
+        downloadFileMonitored(urlInput, nameOutput, monitor, true);
+    }
+    public static void downloadFileMonitored(String urlInput,String nameOutput, DownloaderFeedback monitor, boolean replaceUrl) throws IOException {
         if(!new File(nameOutput).exists()){
             new File(nameOutput).getParentFile().mkdirs();
         }
-        HttpURLConnection conn = (HttpURLConnection) new URL(replaceUrl(urlInput)).openConnection();
+        HttpURLConnection conn = (HttpURLConnection) new URL(replaceUrl ? replaceUrl(urlInput) : urlInput).openConnection();
         InputStream readStr = conn.getInputStream();
-        FileOutputStream fos = new FileOutputStream(new File(nameOutput));
-        int cur = 0; int oval=0; int len = conn.getContentLength(); byte[] buf = new byte[65535];
+        FileOutputStream fos = new FileOutputStream(nameOutput);
+        int cur, oval=0, len = conn.getContentLength(); byte[] buf = new byte[65535];
         while((cur = readStr.read(buf)) != -1) {
             oval += cur;
             fos.write(buf,0,cur);

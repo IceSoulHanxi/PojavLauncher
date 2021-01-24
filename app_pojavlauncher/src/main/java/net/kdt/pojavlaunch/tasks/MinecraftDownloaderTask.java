@@ -1,22 +1,27 @@
 package net.kdt.pojavlaunch.tasks;
 
-import android.app.*;
-import android.content.*;
-import android.graphics.*;
-import android.os.*;
-import android.util.*;
-import com.google.gson.*;
+import android.app.ActivityOptions;
+import android.content.Intent;
+import android.graphics.Rect;
+import android.os.AsyncTask;
+import android.util.DisplayMetrics;
+import android.util.Log;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
+import net.kdt.pojavlaunch.*;
+import net.kdt.pojavlaunch.prefs.LauncherPreferences;
+import net.kdt.pojavlaunch.utils.DownloadUtils;
+import net.kdt.pojavlaunch.value.DependentLibrary;
+import net.kdt.pojavlaunch.value.MinecraftClientInfo;
+import net.kdt.pojavlaunch.value.MinecraftLibraryArtifact;
+import org.apache.commons.io.IOUtils;
+
 import java.io.*;
-import java.util.*;
-import java.util.function.Supplier;
+import java.util.Map;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
-
-import net.kdt.pojavlaunch.*;
-import net.kdt.pojavlaunch.prefs.*;
-import net.kdt.pojavlaunch.utils.*;
-import net.kdt.pojavlaunch.value.*;
-import org.apache.commons.io.*;
 
 public class MinecraftDownloaderTask extends AsyncTask<String, String, Throwable>
  {
@@ -84,7 +89,7 @@ public class MinecraftDownloaderTask extends AsyncTask<String, String, Throwable
                         outLib = new File(Tools.DIR_HOME_LIBRARY + "/" + libArtifact);
                         outLib.getParentFile().mkdirs();
 
-                        if (!outLib.exists()) {
+                        if (!outLib.exists() || !Tools.getSHA1(outLib).equals(libItem.downloads.artifact.sha1)) {
                             publishProgress("1", mActivity.getString(R.string.mcl_launch_downloading, libItem.name));
 
                             boolean skipIfFailed = false;
@@ -107,7 +112,8 @@ public class MinecraftDownloaderTask extends AsyncTask<String, String, Throwable
                                                 public void updateProgress(int curr, int max) {
                                                     publishDownloadProgress(libItem.name, curr, max);
                                                 }
-                                            }
+                                            },
+                                            i == 0
                                     );
                                     break;
                                 } catch (Throwable th) {
@@ -302,7 +308,7 @@ public class MinecraftDownloaderTask extends AsyncTask<String, String, Throwable
     public void downloadAsset(JAssetInfo asset, File objectsDir) throws IOException, Throwable {
         String assetPath = asset.hash.substring(0, 2) + "/" + asset.hash;
         File outFile = new File(objectsDir, assetPath);
-        if (!outFile.exists()) {
+        if (!outFile.exists() || !Tools.getSHA1(outFile).equals(asset.hash)) {
             DownloadUtils.downloadFile(MINECRAFT_RES + assetPath, outFile);
         }
     }
@@ -390,9 +396,6 @@ public class MinecraftDownloaderTask extends AsyncTask<String, String, Throwable
             }
         }
 
-//        File mcbbsMirrorReplacerFile = new File(outputDir, "modpack/McbbsMirror-1.0.jar");
-//        DownloadUtils.downloadFile("https://storage.ixnah.com/Minecraft/McbbsMirror-1.0.jar", mcbbsMirrorReplacerFile);
-//        publishProgress("1", mActivity.getString(R.string.mcl_launch_downloading, mcbbsMirrorReplacerFile.getName()));
         String forgeInstallerUrl = String.format(FORGE_INSTALLER_URL, version, forgeVersion, version, forgeVersion);
         File forgeInstallerFile = new File(outputDir, "libraries/" + String.format(FORGE_INSTALLER_PATH, version, forgeVersion, version, forgeVersion));
         zeroProgress();
@@ -437,6 +440,7 @@ public class MinecraftDownloaderTask extends AsyncTask<String, String, Throwable
                 installProfile.getAsJsonArray("libraries") : new JsonArray();
         JsonArray versionLibraries = versionJson != null && versionJson.has("libraries") ?
                 versionJson.getAsJsonArray("libraries") : new JsonArray();
+        libraries.addAll(versionLibraries);
         for (JsonElement element : libraries) {
             JsonObject library = element.getAsJsonObject();
             String name = library.get("name").getAsString();
@@ -444,59 +448,34 @@ public class MinecraftDownloaderTask extends AsyncTask<String, String, Throwable
             JsonObject artifact = downloads.get("artifact").getAsJsonObject();
             String path = artifact.get("path").getAsString();
             String url = artifact.get("url").getAsString();
+            String sha1 = artifact.get("sha1").getAsString();
             if (url.isEmpty()) {
                 System.out.println("url is empty! " + library);
                 continue;
             }
             File libraryFile = new File(librariesDirFile, path);
-            for (int i = 0, size = 5; i < size; i ++) {
-                try {
-                    Tools.downloadFileMonitored(
-                            url,
-                            libraryFile.getAbsolutePath(),
-                            new Tools.DownloaderFeedback() {
-                                @Override
-                                public void updateProgress(int curr, int max) {
-                                    publishDownloadProgress(name, curr, max);
-                                }
-                            }
-                    );
-                    break;
-                } catch (Throwable th) {
-                    th.printStackTrace();
-                    publishProgress("0", th.getMessage());
-                    publishProgress("0", library.toString());
-                    if (i + 1 == size) throw th;
-                }
-            }
-        }
-        for (JsonElement element : versionLibraries) {
-            JsonObject library = element.getAsJsonObject();
-            String name = library.get("name").getAsString();
-            JsonObject downloads = library.get("downloads").getAsJsonObject();
-            JsonObject artifact = downloads.get("artifact").getAsJsonObject();
-            String path = artifact.get("path").getAsString();
-            String url = artifact.get("url").getAsString();
-            if (url.isEmpty()) continue;
-            File libraryFile = new File(librariesDirFile, path);
-            for (int i = 0, size = 5; i < size; i ++) {
-                try {
-                    Tools.downloadFileMonitored(
-                            url,
-                            libraryFile.getAbsolutePath(),
-                            new Tools.DownloaderFeedback() {
-                                @Override
-                                public void updateProgress(int curr, int max) {
-                                    publishDownloadProgress(name, curr, max);
-                                }
-                            }
-                    );
-                    break;
-                } catch (Throwable th) {
-                    th.printStackTrace();
-                    publishProgress("0", th.getMessage());
-                    publishProgress("0", library.toString());
-                    if (i + 1 == size) throw th;
+            if (!libraryFile.exists() || !Tools.getSHA1(libraryFile).equals(sha1)) {
+                publishProgress("1", mActivity.getString(R.string.mcl_launch_downloading, libraryFile.getName()));
+                for (int i = 0, size = 5; i < size; i ++) {
+                    try {
+                        Tools.downloadFileMonitored(
+                                url,
+                                libraryFile.getAbsolutePath(),
+                                new Tools.DownloaderFeedback() {
+                                    @Override
+                                    public void updateProgress(int curr, int max) {
+                                        publishDownloadProgress(name, curr, max);
+                                    }
+                                },
+                                i == 0
+                        );
+                        break;
+                    } catch (Throwable th) {
+                        th.printStackTrace();
+                        publishProgress("0", th.getMessage());
+                        publishProgress("0", library.toString());
+                        if (i + 1 == size) throw th;
+                    }
                 }
             }
         }
